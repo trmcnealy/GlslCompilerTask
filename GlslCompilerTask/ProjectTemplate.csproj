@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
+    
+    <Import Project="$(MSBuildStartupDirectory)Build\glsl.props" Condition="Exists('$(MSBuildStartupDirectory)Build\glsl.props')" />
+
+    <PropertyGroup>
+        <TargetFramework>$targetframework$</TargetFramework>
+    </PropertyGroup>
+
+    <!--<ItemGroup>
+        <VertexShader Include="Shaders\Line.vert" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <FragmentShader Include="Shaders\Line.frag" />
+    </ItemGroup>
+    
+    <ItemGroup>
+        <GlslShader Include="Shaders\Line.glsl" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Remove="Shaders\Line.frag" />
+        <None Remove="Shaders\Line.vert" />
+        <None Remove="Shaders\Line.glsl" />
+    </ItemGroup>-->
+
+    <Import Project="$(MSBuildStartupDirectory)Build\glsl.targets" Condition="Exists('$(MSBuildStartupDirectory)Build\glsl.targets')" />
+
+</Project>

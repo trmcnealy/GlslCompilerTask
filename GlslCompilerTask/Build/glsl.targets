@@ -1,0 +1,461 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    
+    <ItemGroup>
+        <PropertyPageSchema Include="$(MSBuildThisFileDirectory)glsl.xml" />
+
+        <AvailableItemName Include="VertexShader">
+            <Targets>BuildVertexShader</Targets>
+        </AvailableItemName>
+        <AvailableItemName Include="FragmentShader">
+            <Targets>BuildFragmentShader</Targets>
+        </AvailableItemName>
+        <AvailableItemName Include="GlslShader">
+            <Targets>BuildGlslShader</Targets>
+        </AvailableItemName>
+        
+    </ItemGroup>
+
+
+    <UsingTask TaskName="VertexShaderTask" TaskFactory="RoslynCodeTaskFactory" AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll" >
+        <ParameterGroup>
+            <Files ParameterType="Microsoft.Build.Framework.ITaskItem[]" Required="true" />
+            <Configuration ParameterType="System.String" Required="true" />
+            <OutputFiles ParameterType="Microsoft.Build.Framework.ITaskItem[]" Output="true" />
+            <Errors ParameterType="System.String" Output="true" />
+        </ParameterGroup>
+        <Task>
+            <Using Namespace="System.Diagnostics"/>
+            <Using Namespace="System.IO"/>
+            <Using Namespace="System.Linq"/>
+            <Code Type="Fragment" Language="cs">
+<![CDATA[
+            ProcessStartInfo glslangValidatorStartInfo;
+            Process          glslangValidatorProcess;
+            ProcessStartInfo spirv_crossStartInfo;
+            Process          spirv_crossProcess;
+            
+            OutputFiles = new TaskItem[Files.Length];
+            Errors = string.Empty;
+            
+            string debug = (Configuration == "Release") ? "-O" : "-g";
+            
+            ITaskItem item;
+            string sourceFileDir;
+            string sourceFilePath;
+            string sourceFileName;
+            string sprivFilePath;
+
+            string target_env = "opengl"; //"vulkan1.2";
+            
+            string vulkansdk_path = Environment.GetEnvironmentVariable("VULKANSDK_PATH");
+            
+            if(string.IsNullOrEmpty(vulkansdk_path))
+            {
+                Log.LogError("Environment variable VULKANSDK_PATH is missing. Find the Sdk here...https://vulkan.lunarg.com/sdk/home");
+                return false;
+            }
+            
+            string glslangValidatorExePath = Path.Combine(vulkansdk_path, "bin", "glslangValidator.exe");
+            string spirvcrossExePath = Path.Combine(vulkansdk_path, "bin", "spirv-cross.exe");
+
+            for (int i = 0; i < Files.Length; i++)
+            {
+                item           = Files[i];
+                sourceFilePath = item.GetMetadata("FullPath"); //.Replace("\\", "/");
+                sourceFileDir  = Path.GetDirectoryName(sourceFilePath);
+                sourceFileName = Path.GetFileNameWithoutExtension(sourceFilePath);
+                sprivFilePath  = sourceFilePath + ".spv"; //.Replace("\\", "/");
+                OutputFiles[i] = new TaskItem(sprivFilePath);
+                
+                glslangValidatorStartInfo = new ProcessStartInfo
+                {
+                    //glslangValidator
+                    FileName               = glslangValidatorExePath,
+                    // --auto-map-locations
+                    Arguments              = "-I" + sourceFileDir + " -t -S vert --glsl-version 330 --auto-map-locations --target-env " + target_env + " " + debug + " " + sourceFilePath + " -o " + sprivFilePath,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError  = true,
+                    UseShellExecute        = false,
+                    CreateNoWindow         = true
+                };
+                
+                Log.LogMessage(MessageImportance.High, glslangValidatorStartInfo.FileName + " " + glslangValidatorStartInfo.Arguments);
+
+                Errors += glslangValidatorStartInfo.FileName + " " + glslangValidatorStartInfo.Arguments;
+
+                glslangValidatorProcess = new Process();
+                glslangValidatorProcess.StartInfo = glslangValidatorStartInfo;                
+                glslangValidatorProcess.EnableRaisingEvents = true;
+                glslangValidatorProcess.OutputDataReceived += new DataReceivedEventHandler((sender, e) =>
+                {
+                    if (!string.IsNullOrEmpty(e.Data))
+                    {
+                        //Log.LogMessage(MessageImportance.High, e.Data);
+                        
+                        if(e.Data != sourceFilePath)
+                        {
+                            Log.LogError(e.Data);
+                        }
+                        Errors += e.Data;
+                    }
+                });
+                glslangValidatorProcess.ErrorDataReceived  += new DataReceivedEventHandler((sender, e) =>
+                {
+                    if (!string.IsNullOrEmpty(e.Data))
+                    {
+                        Log.LogError(e.Data);
+                        Errors += e.Data;
+                    }
+                });
+                glslangValidatorProcess.Start();                
+                glslangValidatorProcess.BeginOutputReadLine();
+                glslangValidatorProcess.BeginErrorReadLine();            
+                glslangValidatorProcess.WaitForExit();
+                glslangValidatorProcess.Close();
+
+                spirv_crossStartInfo = new ProcessStartInfo
+                {
+                    FileName               = spirvcrossExePath,
+                    Arguments              = "--cpp-interface-name " + sourceFileName + " " + sprivFilePath + " --output " + sprivFilePath + ".cpp",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError  = true,
+                    UseShellExecute        = false,
+                    CreateNoWindow         = true
+                };
+                
+                Log.LogMessage(MessageImportance.High, spirv_crossStartInfo.FileName + " " + spirv_crossStartInfo.Arguments);
+
+                Errors += spirv_crossStartInfo.FileName + " " + spirv_crossStartInfo.Arguments;
+
+                spirv_crossProcess = new Process();
+                spirv_crossProcess.StartInfo = spirv_crossStartInfo;                
+                spirv_crossProcess.EnableRaisingEvents = true;
+                spirv_crossProcess.OutputDataReceived += new DataReceivedEventHandler((sender, e) =>
+                {
+                    if (!string.IsNullOrEmpty(e.Data))
+                    {
+                        //Log.LogMessage(MessageImportance.High, e.Data);
+                        
+                        if(e.Data != sourceFilePath)
+                        {
+                            Log.LogError(e.Data);
+                        }
+                        Errors += e.Data;
+                    }
+                });
+                spirv_crossProcess.ErrorDataReceived  += new DataReceivedEventHandler((sender, e) =>
+                {
+                    if (!string.IsNullOrEmpty(e.Data))
+                    {
+                        Log.LogError(e.Data);
+                        Errors += e.Data;
+                    }
+                });
+                spirv_crossProcess.Start();                
+                spirv_crossProcess.BeginOutputReadLine();
+                spirv_crossProcess.BeginErrorReadLine();            
+                spirv_crossProcess.WaitForExit();
+                spirv_crossProcess.Close();
+
+            }
+]]>
+            </Code>
+        </Task>
+    </UsingTask>
+
+    <Target Name="BuildVertexShader"
+            Condition="'@(VertexShader)' != ''"
+            BeforeTargets="BeforeCompile;CoreCompile">
+
+        <Message Importance="High" Text="VertexShader=@(VertexShader)" />
+        
+        <VertexShaderTask Files="@(VertexShader)" Configuration="$(Configuration)">
+            <Output ItemName="OutputFiles" TaskParameter="OutputFiles" />
+            <Output ItemName="Errors" TaskParameter="Errors" />
+        </VertexShaderTask>
+
+        <Message Importance="High" Text="$(Errors)" />
+    </Target>
+
+    <UsingTask TaskName="FragmentShaderTask" TaskFactory="RoslynCodeTaskFactory" AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll" >
+        <ParameterGroup>
+            <Files ParameterType="Microsoft.Build.Framework.ITaskItem[]" Required="true" />
+            <Configuration ParameterType="System.String" Required="true" />
+
+            <OutputFiles ParameterType="Microsoft.Build.Framework.ITaskItem[]" Output="true" />
+            <Errors ParameterType="System.String" Output="true" />
+        </ParameterGroup>
+        <Task>
+            <Using Namespace="System.Diagnostics"/>
+            <Using Namespace="System.IO"/>
+            <Using Namespace="System.Linq"/>
+            <Code Type="Fragment" Language="cs">
+<![CDATA[
+            ProcessStartInfo glslangValidatorStartInfo;
+            Process          glslangValidatorProcess;
+            ProcessStartInfo spirv_crossStartInfo;
+            Process          spirv_crossProcess;
+            
+            OutputFiles = new TaskItem[Files.Length];
+            Errors = string.Empty;
+            
+            string debug = (Configuration == "Release") ? "-O" : "-g";
+            
+            ITaskItem item;
+            string sourceFileDir;
+            string sourceFilePath;
+            string sourceFileName;
+            string sprivFilePath;
+            
+            string target_env = "opengl"; //"vulkan1.2";
+            
+            string vulkansdk_path = Environment.GetEnvironmentVariable("VULKANSDK_PATH");
+            
+            if(string.IsNullOrEmpty(vulkansdk_path))
+            {
+                Log.LogError("Environment variable VULKANSDK_PATH, contains glslangValidator.exe and spirv-cross.exe, is missing. Find the Sdk here...https://vulkan.lunarg.com/sdk/home"); 
+                return false;
+            }
+            
+            string glslangValidatorExePath = Path.Combine(vulkansdk_path, "bin", "glslangValidator.exe");
+            string spirvcrossExePath = Path.Combine(vulkansdk_path, "bin", "spirv-cross.exe");
+
+            for (int i = 0; i < Files.Length; i++)
+            {
+                item           = Files[i];
+                sourceFilePath = item.GetMetadata("FullPath"); //.Replace("\\", "/");
+                sourceFileDir  = Path.GetDirectoryName(sourceFilePath);
+                sourceFileName = Path.GetFileNameWithoutExtension(sourceFilePath);
+                sprivFilePath  = sourceFilePath + ".spv"; //.Replace("\\", "/");
+                OutputFiles[i] = new TaskItem(sprivFilePath);
+                
+                glslangValidatorStartInfo = new ProcessStartInfo
+                {
+                    FileName               = glslangValidatorExePath,
+                    // --auto-map-locations
+                    Arguments              = "-I" + sourceFileDir + " -t -S frag --glsl-version 330 --auto-map-locations --target-env " + target_env + " " + debug + " " + sourceFilePath + " -o " + sprivFilePath,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError  = true,
+                    UseShellExecute        = false,
+                    CreateNoWindow         = true
+                };
+                
+                Log.LogMessage(MessageImportance.High, glslangValidatorStartInfo.FileName + " " + glslangValidatorStartInfo.Arguments);
+
+                Errors += glslangValidatorStartInfo.FileName + " " + glslangValidatorStartInfo.Arguments;
+
+                glslangValidatorProcess = new Process();
+                glslangValidatorProcess.StartInfo = glslangValidatorStartInfo;                
+                glslangValidatorProcess.EnableRaisingEvents = true;
+                glslangValidatorProcess.OutputDataReceived += new DataReceivedEventHandler((sender, e) =>
+                {
+                    if (!string.IsNullOrEmpty(e.Data))
+                    {
+                        //Log.LogMessage(MessageImportance.High, e.Data);
+                        
+                        if(e.Data != sourceFilePath)
+                        {
+                            Log.LogError(e.Data);
+                        }
+                        Errors += e.Data;
+                    }
+                });
+                glslangValidatorProcess.ErrorDataReceived  += new DataReceivedEventHandler((sender, e) =>
+                {
+                    if (!string.IsNullOrEmpty(e.Data))
+                    {
+                        Log.LogError(e.Data);
+                        Errors += e.Data;
+                    }
+                });
+                glslangValidatorProcess.Start();                
+                glslangValidatorProcess.BeginOutputReadLine();
+                glslangValidatorProcess.BeginErrorReadLine();            
+                glslangValidatorProcess.WaitForExit();
+                glslangValidatorProcess.Close();
+
+                spirv_crossStartInfo = new ProcessStartInfo
+                {
+                    FileName               = spirvcrossExePath,
+                    Arguments              = "--cpp-interface-name " + sourceFileName + " " + sprivFilePath + " --output " + sprivFilePath + ".cpp",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError  = true,
+                    UseShellExecute        = false,
+                    CreateNoWindow         = true
+                };
+                
+                Log.LogMessage(MessageImportance.High, spirv_crossStartInfo.FileName + " " + spirv_crossStartInfo.Arguments);
+
+                Errors += spirv_crossStartInfo.FileName + " " + spirv_crossStartInfo.Arguments;
+
+                spirv_crossProcess = new Process();
+                spirv_crossProcess.StartInfo = spirv_crossStartInfo;                
+                spirv_crossProcess.EnableRaisingEvents = true;
+                spirv_crossProcess.OutputDataReceived += new DataReceivedEventHandler((sender, e) =>
+                {
+                    if (!string.IsNullOrEmpty(e.Data))
+                    {
+                        //Log.LogMessage(MessageImportance.High, e.Data);
+                        
+                        if(e.Data != sourceFilePath)
+                        {
+                            Log.LogError(e.Data);
+                        }
+                        Errors += e.Data;
+                    }
+                });
+                spirv_crossProcess.ErrorDataReceived  += new DataReceivedEventHandler((sender, e) =>
+                {
+                    if (!string.IsNullOrEmpty(e.Data))
+                    {
+                        Log.LogError(e.Data);
+                        Errors += e.Data;
+                    }
+                });
+                spirv_crossProcess.Start();                
+                spirv_crossProcess.BeginOutputReadLine();
+                spirv_crossProcess.BeginErrorReadLine();            
+                spirv_crossProcess.WaitForExit();
+                spirv_crossProcess.Close();
+
+            }
+]]>
+</Code>
+        </Task>
+    </UsingTask>
+
+
+
+    <UsingTask TaskName="LinkShadersTask" TaskFactory="RoslynCodeTaskFactory" AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll" >
+        <ParameterGroup>
+            <Files ParameterType="Microsoft.Build.Framework.ITaskItem[]" Required="true" />
+            <Configuration ParameterType="System.String" Required="true" />
+
+            <OutputFiles ParameterType="Microsoft.Build.Framework.ITaskItem[]" Output="true" />
+            <Errors ParameterType="System.String" Output="true" />
+        </ParameterGroup>
+        <Task>
+            <Using Namespace="System.Diagnostics"/>
+            <Using Namespace="System.IO"/>
+            <Using Namespace="System.Linq"/>
+            <Code Type="Fragment" Language="cs">
+<![CDATA[
+            ProcessStartInfo spirv_linkStartInfo;
+            Process          spirv_linkProcess;
+            
+            OutputFiles = new TaskItem[Files.Length];
+            Errors = string.Empty;
+                        
+            ITaskItem item;
+            string    sourceFileDir;
+            string    sourceFilePath;
+            string    sourceFileName;
+
+            string    vertspvFilePath;
+            string    fragspvFilePath;
+            string    spvFilePath;
+            
+            string vulkansdk_path = Environment.GetEnvironmentVariable("VULKANSDK_PATH");
+            
+            if(string.IsNullOrEmpty(vulkansdk_path))
+            {
+                Log.LogError("Environment variable VULKANSDK_PATH, contains glslangValidator.exe and spirv-cross.exe, is missing. Find the Sdk here...https://vulkan.lunarg.com/sdk/home");
+                return false;
+            }
+            
+            string spirvlinkExePath = Path.Combine(vulkansdk_path, "bin", "spirv-link.exe");
+
+            for (int i = 0; i < Files.Length; i++)
+            {
+                item           = Files[i];
+                sourceFilePath = item.GetMetadata("FullPath");
+                sourceFileDir  = Path.GetDirectoryName(sourceFilePath);
+                sourceFileName = Path.GetFileNameWithoutExtension(sourceFilePath);
+                fragspvFilePath  = sourceFilePath + ".spv";
+                vertspvFilePath  = fragspvFilePath.Replace(".frag.", ".vert.");
+                spvFilePath  = fragspvFilePath.Replace(".frag.spv", ".spv");
+
+                OutputFiles[i] = new TaskItem(spvFilePath);
+                
+                spirv_linkStartInfo = new ProcessStartInfo
+                {
+                    FileName               = spirvlinkExePath,
+                    Arguments              = fragspvFilePath + " " + vertspvFilePath + " -o " + spvFilePath,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError  = true,
+                    UseShellExecute        = false,
+                    CreateNoWindow         = true
+                };
+                
+                Log.LogMessage(MessageImportance.High, spirv_linkStartInfo.FileName + " " + spirv_linkStartInfo.Arguments);
+
+                Errors += spirv_linkStartInfo.FileName + " " + spirv_linkStartInfo.Arguments;
+
+                spirv_linkProcess = new Process();
+                spirv_linkProcess.StartInfo = spirv_linkStartInfo;                
+                spirv_linkProcess.EnableRaisingEvents = true;
+                spirv_linkProcess.OutputDataReceived += new DataReceivedEventHandler((sender, e) =>
+                {
+                    if (!string.IsNullOrEmpty(e.Data))
+                    {
+                        //Log.LogMessage(MessageImportance.High, e.Data);
+                        
+                        if(e.Data != sourceFilePath)
+                        {
+                            Log.LogError(e.Data);
+                        }
+                        Errors += e.Data;
+                    }
+                });
+                spirv_linkProcess.ErrorDataReceived  += new DataReceivedEventHandler((sender, e) =>
+                {
+                    if (!string.IsNullOrEmpty(e.Data))
+                    {
+                        Log.LogError(e.Data);
+                        Errors += e.Data;
+                    }
+                });
+                spirv_linkProcess.Start();                
+                spirv_linkProcess.BeginOutputReadLine();
+                spirv_linkProcess.BeginErrorReadLine();            
+                spirv_linkProcess.WaitForExit();
+                spirv_linkProcess.Close();
+                
+                File.Delete(vertspvFilePath);
+                File.Delete(fragspvFilePath);
+            }
+]]>
+</Code>
+        </Task>
+    </UsingTask>
+
+
+
+
+
+<!--DependsOnTargets="BuildVertexShader"-->
+    <Target Name="BuildFragmentShader"
+            Condition="'@(FragmentShader)' != ''"
+            BeforeTargets="Compile">
+
+        <Message Importance="High" Text="FragmentShader=@(FragmentShader)" />
+
+        <FragmentShaderTask Files="@(FragmentShader)" Configuration="$(Configuration)">
+            <Output ItemName="OutputFiles" TaskParameter="OutputFiles" />
+            <Output ItemName="Errors" TaskParameter="Errors" />
+        </FragmentShaderTask>
+
+        <Message Importance="High" Text="$(Errors)" />
+
+
+        <!--<LinkShadersTask Files="@(FragmentShader)" Configuration="$(Configuration)">
+            <Output ItemName="OutputFiles" TaskParameter="OutputFiles" />
+            <Output ItemName="Errors" TaskParameter="Errors" />
+        </LinkShadersTask>
+
+        <Message Importance="High" Text="$(Errors)" />-->
+
+    </Target>
+
+</Project>

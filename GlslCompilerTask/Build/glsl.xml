@@ -1,0 +1,16 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<ProjectSchemaDefinitions xmlns="http://schemas.microsoft.com/build/2009/properties">
+
+    <ItemType Name="VertexShader" DisplayName="Vertex Shader" />
+    <ContentType Name="VertexShader" ItemType="VertexShader" DisplayName="Vertex Shader" />
+    <FileExtension Name=".vert" ContentType="VertexShader" />
+
+    <ItemType Name="FragmentShader" DisplayName="Fragment Shader" />
+    <ContentType Name="FragmentShader" ItemType="FragmentShader" DisplayName="Fragment Shader" />
+    <FileExtension Name=".frag" ContentType="FragmentShader" />
+    
+    <ItemType Name="GlslShader" DisplayName="Glsl Shader" />
+    <ContentType Name="GlslShader" ItemType="GlslShader" DisplayName="Glsl Shader" />
+    <FileExtension Name=".glsl" ContentType="GlslShader" />
+
+</ProjectSchemaDefinitions>

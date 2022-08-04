@@ -1,0 +1,34 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+    <ItemGroup>
+        <UpToDateCheckInput Include="@(Content->WithMetadataValue('Extension', '.vert'))"/>
+        <Watch Include="@(Content->WithMetadataValue('Extension', '.vert'))"/>
+        
+        <UpToDateCheckInput Include="@(Content->WithMetadataValue('Extension', '.frag'))"/>
+        <Watch Include="@(Content->WithMetadataValue('Extension', '.frag'))"/>
+        
+        <UpToDateCheckInput Include="@(Content->WithMetadataValue('Extension', '.glsl'))"/>
+        <Watch Include="@(Content->WithMetadataValue('Extension', '.glsl'))"/>
+    </ItemGroup>
+
+    <!--vert, tesc, tese, geom, frag, or comp-->
+
+    <!--<PropertyGroup Condition="'$(VertexShaderTaskBeforeTargets)' == '' and '$(VertexShaderTaskAfterTargets)' == ''">
+        <VertexShaderTaskBeforeTargets>Midl</VertexShaderTaskBeforeTargets>
+        <VertexShaderTaskAfterTargets>CustomBuild</VertexShaderTaskAfterTargets>
+    </PropertyGroup>-->
+
+    <!--<ItemDefinitionGroup>
+        <VertexShaderTask>
+            <ContentOutput Condition="'%(VertexShaderTask.ContentOutput)' == ''">@(VertexShader->'%(RootDir)%(Directory)%(Filename).vert.spv', ' ')</ContentOutput>
+        </VertexShaderTask>
+        <FragmentShaderTask>
+            <ContentOutput Condition="'%(FragmentShaderTask.ContentOutput)' == ''">@(FragmentShader->'%(RootDir)%(Directory)%(Filename).frag.spv', ' ')</ContentOutput>
+        </FragmentShaderTask>
+        <GlslShaderTask>
+            <ContentOutput Condition="'%(GlslShaderTask.ContentOutput)' == ''">@(GlslShader->'%(RootDir)%(Directory)%(Filename).glsl.spv', ' ')</ContentOutput>
+        </GlslShaderTask>    
+    </ItemDefinitionGroup>-->
+    
+</Project>
